@@ -1,8 +1,8 @@
 VERSION ?= v0.7.0
 REMOTE ?= origin
-DOCKER_REPO ?= jvstein/bitcoin-prometheus-exporter
+DOCKER_REPO ?= pinheadmz/bitcoin-exporter
 PLATFORMS ?= linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x
-LATEST ?= latest
+LATEST ?= block-relay
 
 # Builds for local platform only.
 docker:
