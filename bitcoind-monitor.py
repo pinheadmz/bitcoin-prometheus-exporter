@@ -67,6 +67,12 @@ BITCOIN_MEMPOOL_UNBROADCAST = Gauge(
     "bitcoin_mempool_unbroadcast", "Number of transactions waiting for acknowledgment"
 )
 
+BITCOIN_PEERMEM_CNODE_WITHTX = Gauge("bitcoin_peermem_cnode_withtx", "Total dynamic CNode memory for peers that relay TXs")
+BITCOIN_PEERMEM_PEER_WITHTX  = Gauge("bitcoin_peermem_peer_withtx",  "Total current Peer memory for peers that relay TXs")
+BITCOIN_PEERMEM_CNODE_NOTX   = Gauge("bitcoin_peermem_cnode_notx",   "Total dynamic CNode memory for peers that DON'T relay TXs")
+BITCOIN_PEERMEM_PEER_NOTX    = Gauge("bitcoin_peermem_peer_notx",    "Total current Peer memory for peers that DON'T relay TXs")
+
+
 BITCOIN_LATEST_BLOCK_HEIGHT = Gauge(
     "bitcoin_latest_block_height", "Height or index of latest block"
 )
@@ -264,82 +270,103 @@ def do_hashps_gauge(num_blocks: int) -> None:
 
 
 def refresh_metrics() -> None:
-    uptime = int(bitcoinrpc("uptime"))
+    # uptime = int(bitcoinrpc("uptime"))
     meminfo = bitcoinrpc("getmemoryinfo", "stats")["locked"]
-    blockchaininfo = bitcoinrpc("getblockchaininfo")
+    # blockchaininfo = bitcoinrpc("getblockchaininfo")
     networkinfo = bitcoinrpc("getnetworkinfo")
-    chaintips = len(bitcoinrpc("getchaintips"))
+    # chaintips = len(bitcoinrpc("getchaintips"))
     mempool = bitcoinrpc("getmempoolinfo")
     nettotals = bitcoinrpc("getnettotals")
-    rpcinfo = bitcoinrpc("getrpcinfo")
-    txstats = bitcoinrpc("getchaintxstats")
-    latest_blockstats = getblockstats(str(blockchaininfo["bestblockhash"]))
+    # rpcinfo = bitcoinrpc("getrpcinfo")
+    # txstats = bitcoinrpc("getchaintxstats")
+    # latest_blockstats = getblockstats(str(blockchaininfo["bestblockhash"]))
 
-    banned = bitcoinrpc("listbanned")
+    # banned = bitcoinrpc("listbanned")
 
-    BITCOIN_UPTIME.set(uptime)
-    BITCOIN_BLOCKS.set(blockchaininfo["blocks"])
-    BITCOIN_PEERS.set(networkinfo["connections"])
+    try:
+        peermem = bitcoinrpc("getpeermemoryinfo")
+        cnode_withtx = 0
+        peer_withtx = 0
+        cnode_notx = 0
+        peer_notx = 0
+        for peer in peermem:
+            if peer["relay_txs"]:
+                cnode_withtx += peer["dynamic_cnode_memory"]
+                peer_withtx += peer["current_peer_memory"]
+            else:
+                cnode_notx += peer["dynamic_cnode_memory"]
+                peer_notx += peer["current_peer_memory"]
+        BITCOIN_PEERMEM_CNODE_WITHTX.set(cnode_withtx)
+        BITCOIN_PEERMEM_PEER_WITHTX.set(peer_withtx)
+        BITCOIN_PEERMEM_CNODE_NOTX.set(cnode_notx)
+        BITCOIN_PEERMEM_PEER_NOTX.set(peer_notx)
+    except Exception:
+        # Custom RPC might not exist in all nodes
+        pass
+
+    # BITCOIN_UPTIME.set(uptime)
+    # BITCOIN_BLOCKS.set(blockchaininfo["blocks"])
+    # BITCOIN_PEERS.set(networkinfo["connections"])
     if "connections_in" in networkinfo:
         BITCOIN_CONN_IN.set(networkinfo["connections_in"])
     if "connections_out" in networkinfo:
         BITCOIN_CONN_OUT.set(networkinfo["connections_out"])
-    BITCOIN_DIFFICULTY.set(blockchaininfo["difficulty"])
+    # BITCOIN_DIFFICULTY.set(blockchaininfo["difficulty"])
 
-    BITCOIN_SERVER_VERSION.set(networkinfo["version"])
-    BITCOIN_PROTOCOL_VERSION.set(networkinfo["protocolversion"])
-    BITCOIN_SIZE_ON_DISK.set(blockchaininfo["size_on_disk"])
-    BITCOIN_VERIFICATION_PROGRESS.set(blockchaininfo["verificationprogress"])
+    # BITCOIN_SERVER_VERSION.set(networkinfo["version"])
+    # BITCOIN_PROTOCOL_VERSION.set(networkinfo["protocolversion"])
+    # BITCOIN_SIZE_ON_DISK.set(blockchaininfo["size_on_disk"])
+    # BITCOIN_VERIFICATION_PROGRESS.set(blockchaininfo["verificationprogress"])
 
-    for smartfee in SMART_FEES:
-        do_smartfee(smartfee)
+    # for smartfee in SMART_FEES:
+    #     do_smartfee(smartfee)
 
-    for hashps_block in HASHPS_BLOCKS:
-        do_hashps_gauge(hashps_block)
+    # for hashps_block in HASHPS_BLOCKS:
+    #     do_hashps_gauge(hashps_block)
 
-    for ban in banned:
-        BITCOIN_BAN_CREATED.labels(
-            address=ban["address"], reason=ban.get("ban_reason", "manually added")
-        ).set(ban["ban_created"])
-        BITCOIN_BANNED_UNTIL.labels(
-            address=ban["address"], reason=ban.get("ban_reason", "manually added")
-        ).set(ban["banned_until"])
+    # for ban in banned:
+    #     BITCOIN_BAN_CREATED.labels(
+    #         address=ban["address"], reason=ban.get("ban_reason", "manually added")
+    #     ).set(ban["ban_created"])
+    #     BITCOIN_BANNED_UNTIL.labels(
+    #         address=ban["address"], reason=ban.get("ban_reason", "manually added")
+    #     ).set(ban["banned_until"])
 
-    if networkinfo["warnings"]:
-        BITCOIN_WARNINGS.inc()
+    # if networkinfo["warnings"]:
+    #     BITCOIN_WARNINGS.inc()
 
-    BITCOIN_TXCOUNT.set(txstats["txcount"])
+    # BITCOIN_TXCOUNT.set(txstats["txcount"])
 
-    BITCOIN_NUM_CHAINTIPS.set(chaintips)
+    # BITCOIN_NUM_CHAINTIPS.set(chaintips)
 
     BITCOIN_MEMINFO_USED.set(meminfo["used"])
-    BITCOIN_MEMINFO_FREE.set(meminfo["free"])
+    # BITCOIN_MEMINFO_FREE.set(meminfo["free"])
     BITCOIN_MEMINFO_TOTAL.set(meminfo["total"])
-    BITCOIN_MEMINFO_LOCKED.set(meminfo["locked"])
-    BITCOIN_MEMINFO_CHUNKS_USED.set(meminfo["chunks_used"])
-    BITCOIN_MEMINFO_CHUNKS_FREE.set(meminfo["chunks_free"])
+    # BITCOIN_MEMINFO_LOCKED.set(meminfo["locked"])
+    # BITCOIN_MEMINFO_CHUNKS_USED.set(meminfo["chunks_used"])
+    # BITCOIN_MEMINFO_CHUNKS_FREE.set(meminfo["chunks_free"])
 
-    BITCOIN_MEMPOOL_BYTES.set(mempool["bytes"])
+    # BITCOIN_MEMPOOL_BYTES.set(mempool["bytes"])
     BITCOIN_MEMPOOL_SIZE.set(mempool["size"])
-    BITCOIN_MEMPOOL_USAGE.set(mempool["usage"])
-    if "unbroadcastcount" in mempool:
-        BITCOIN_MEMPOOL_UNBROADCAST.set(mempool["unbroadcastcount"])
+    # BITCOIN_MEMPOOL_USAGE.set(mempool["usage"])
+    # if "unbroadcastcount" in mempool:
+    #     BITCOIN_MEMPOOL_UNBROADCAST.set(mempool["unbroadcastcount"])
 
     BITCOIN_TOTAL_BYTES_RECV.set(nettotals["totalbytesrecv"])
     BITCOIN_TOTAL_BYTES_SENT.set(nettotals["totalbytessent"])
 
-    if latest_blockstats is not None:
-        BITCOIN_LATEST_BLOCK_SIZE.set(latest_blockstats["total_size"])
-        BITCOIN_LATEST_BLOCK_TXS.set(latest_blockstats["txs"])
-        BITCOIN_LATEST_BLOCK_HEIGHT.set(latest_blockstats["height"])
-        BITCOIN_LATEST_BLOCK_WEIGHT.set(latest_blockstats["total_weight"])
-        BITCOIN_LATEST_BLOCK_INPUTS.set(latest_blockstats["ins"])
-        BITCOIN_LATEST_BLOCK_OUTPUTS.set(latest_blockstats["outs"])
-        BITCOIN_LATEST_BLOCK_VALUE.set(latest_blockstats["total_out"] / SATS_PER_COIN)
-        BITCOIN_LATEST_BLOCK_FEE.set(latest_blockstats["totalfee"] / SATS_PER_COIN)
+    # if latest_blockstats is not None:
+    #     BITCOIN_LATEST_BLOCK_SIZE.set(latest_blockstats["total_size"])
+    #     BITCOIN_LATEST_BLOCK_TXS.set(latest_blockstats["txs"])
+    #     BITCOIN_LATEST_BLOCK_HEIGHT.set(latest_blockstats["height"])
+    #     BITCOIN_LATEST_BLOCK_WEIGHT.set(latest_blockstats["total_weight"])
+    #     BITCOIN_LATEST_BLOCK_INPUTS.set(latest_blockstats["ins"])
+    #     BITCOIN_LATEST_BLOCK_OUTPUTS.set(latest_blockstats["outs"])
+    #     BITCOIN_LATEST_BLOCK_VALUE.set(latest_blockstats["total_out"] / SATS_PER_COIN)
+    #     BITCOIN_LATEST_BLOCK_FEE.set(latest_blockstats["totalfee"] / SATS_PER_COIN)
 
     # Subtract one because we don't want to count the "getrpcinfo" call itself
-    BITCOIN_RPC_ACTIVE.set(len(rpcinfo["active_commands"]) - 1)
+    # BITCOIN_RPC_ACTIVE.set(len(rpcinfo["active_commands"]) - 1)
 
 
 def sigterm_handler(signal, frame) -> None:
